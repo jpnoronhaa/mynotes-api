@@ -2,7 +2,9 @@ package com.jpnoronhaa.mynotes.controller;
 
 import com.jpnoronhaa.mynotes.dto.NoteRequestDTO;
 import com.jpnoronhaa.mynotes.dto.NoteResponseDTO;
+import com.jpnoronhaa.mynotes.dto.SpellingErrorDTO;
 import com.jpnoronhaa.mynotes.service.NoteService;
+import com.jpnoronhaa.mynotes.service.SpellCheckService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -21,6 +23,7 @@ import java.util.List;
 public class NoteController {
 
     private final NoteService noteService;
+    private final SpellCheckService spellCheckService;
 
     @Operation(summary = "Create new note", description = "Receives a markdown and saves it to the database.")
     @PostMapping(consumes = MediaType.TEXT_PLAIN_VALUE)
@@ -43,9 +46,10 @@ public class NoteController {
     }
 
     @Operation(summary = "Update note", description = "Update a note and saves it to the database.")
-    @PutMapping("/{id}")
-    public ResponseEntity<NoteResponseDTO> update(@PathVariable Long id, @RequestBody @Valid NoteRequestDTO request) {
-        return ResponseEntity.ok(noteService.updateNote(id, request));
+    @PutMapping(value = "/{id}", consumes = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<NoteResponseDTO> update(@PathVariable Long id, @RequestBody String content) {
+        NoteRequestDTO requestDTO = new NoteRequestDTO(content);
+        return ResponseEntity.ok(noteService.updateNote(id, requestDTO));
     }
 
     @Operation(summary = "Delete note")
@@ -60,5 +64,16 @@ public class NoteController {
     public ResponseEntity<String> getNoteHtml(@PathVariable Long id) {
         String htmlContent = noteService.renderHtml(id);
         return ResponseEntity.ok(htmlContent);
+    }
+
+    @Operation(summary = "Spelling check of note", description = "Analyzes the note text of an existing note and returns errors and suggestions. Lang accepts 'pt-br' or 'en' (Default: en).")
+    @GetMapping("/{id}/spell-check")
+    public ResponseEntity<List<SpellingErrorDTO>> checkSpelling(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "en", required = false) String lang
+    ) {
+        NoteResponseDTO note = noteService.findById(id);
+        List<SpellingErrorDTO> errors = spellCheckService.checkMarkdownSpelling(note.markdownContent(), lang);
+        return ResponseEntity.ok(errors);
     }
 }
